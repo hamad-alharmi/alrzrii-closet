@@ -1,69 +1,110 @@
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { User, Calendar, ShieldCheck, FileText } from 'lucide-react'
-import { getUserProfile, getFiles } from '@/lib/firestore'
-import FileCard from '@/components/ui/FileCard'
-import { formatDistanceToNow } from 'date-fns'
+import { User, Mail, Shield, Calendar } from 'lucide-react'
+import { getUserDoc, updateUserProfile } from '../services/userService'
+import { useAuthStore } from '../store/authStore'
+import { formatDate } from '../lib/formatters'
+import PageTransition from '../components/ui/PageTransition'
+import Spinner from '../components/ui/Spinner'
+import toast from 'react-hot-toast'
 
 export default function ProfilePage() {
   const { uid } = useParams()
-  const [profile, setProfile] = useState(null)
-  const [files, setFiles] = useState([])
+  const { user, profile: myProfile, setProfile } = useAuthStore()
+  const isOwn = user?.uid === uid
+
+  const [profile, setLocalProfile] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [editing, setEditing] = useState(false)
+  const [displayName, setDisplayName] = useState('')
+  const [bio, setBio] = useState('')
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    async function load() {
-      const p = await getUserProfile(uid)
-      setProfile(p)
-      // Get files owned by this user if admin
-      if (p?.role === 'admin') {
-        const result = await getFiles({ pageSize: 12 })
-        setFiles(result.files.filter(f => f.ownerUID === uid))
-      }
+    getUserDoc(uid).then(p => {
+      setLocalProfile(p)
+      setDisplayName(p?.displayName || '')
+      setBio(p?.bio || '')
       setLoading(false)
-    }
-    load()
+    })
   }, [uid])
 
-  if (loading) return <div className="min-h-screen pt-24 flex items-center justify-center"><div className="w-8 h-8 border-2 border-accent/30 border-t-accent rounded-full animate-spin" /></div>
-  if (!profile) return <div className="min-h-screen pt-24 flex items-center justify-center text-text-muted">User not found</div>
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      await updateUserProfile(uid, { displayName, bio })
+      setLocalProfile(prev => ({ ...prev, displayName, bio }))
+      if (isOwn) setProfile({ ...myProfile, displayName, bio })
+      setEditing(false)
+      toast.success('Profile updated')
+    } catch {
+      toast.error('Update failed')
+    } finally {
+      setSaving(false)
+    }
+  }
 
-  const joinedAt = profile.createdAt?.toDate ? profile.createdAt.toDate() : new Date()
+  if (loading) return <div className="flex justify-center pt-32"><Spinner size={32} /></div>
+  if (!profile) return null
 
   return (
-    <div className="min-h-screen pt-24 pb-16 px-4">
-      <div className="max-w-4xl mx-auto">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="card p-8 mb-8">
-          <div className="flex items-start gap-6">
-            <div className="w-20 h-20 rounded-2xl bg-accent/20 border border-accent/40 flex items-center justify-center flex-shrink-0">
-              <User size={32} className="text-accent" />
+    <PageTransition>
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-10">
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="card p-8">
+          <div className="flex items-start gap-5">
+            <div className="w-16 h-16 rounded-2xl bg-accent/20 flex items-center justify-center text-2xl font-bold text-accent-light flex-shrink-0">
+              {profile.displayName?.[0]?.toUpperCase() || '?'}
             </div>
             <div className="flex-1">
-              <div className="flex items-center gap-3 mb-2 flex-wrap">
-                <h1 className="font-display font-bold text-2xl text-text-primary">{profile.email?.split('@')[0]}</h1>
-                {profile.role === 'admin' && (
-                  <span className="badge bg-ember/10 text-ember border border-ember/20"><ShieldCheck size={11} /> Admin</span>
-                )}
-              </div>
-              <p className="text-text-muted text-sm">{profile.email}</p>
-              <div className="flex items-center gap-2 mt-3 text-text-muted text-sm">
-                <Calendar size={13} />
-                <span>Joined {formatDistanceToNow(joinedAt, { addSuffix: true })}</span>
-              </div>
+              {editing && isOwn ? (
+                <div className="flex flex-col gap-3">
+                  <input
+                    value={displayName}
+                    onChange={e => setDisplayName(e.target.value)}
+                    className="input text-lg font-bold py-2"
+                    placeholder="Display name"
+                  />
+                  <textarea
+                    value={bio}
+                    onChange={e => setBio(e.target.value)}
+                    className="input resize-none text-sm"
+                    rows={3}
+                    placeholder="Short bio..."
+                  />
+                  <div className="flex gap-2">
+                    <button onClick={handleSave} disabled={saving} className="btn-primary text-sm py-2">
+                      {saving ? 'Saving...' : 'Save'}
+                    </button>
+                    <button onClick={() => setEditing(false)} className="btn-ghost text-sm py-2">Cancel</button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center gap-3 mb-1">
+                    <h1 className="text-xl font-bold">{profile.displayName}</h1>
+                    {profile.role === 'admin' && (
+                      <span className="badge bg-accent/15 text-accent-light border border-accent/20 text-xs flex items-center gap-1">
+                        <Shield size={10} /> Admin
+                      </span>
+                    )}
+                  </div>
+                  {profile.bio && <p className="text-white/50 text-sm mb-3">{profile.bio}</p>}
+                  <div className="flex flex-wrap gap-4 text-sm text-white/30">
+                    <span className="flex items-center gap-1.5"><Mail size={13} /> {profile.email}</span>
+                    <span className="flex items-center gap-1.5"><Calendar size={13} /> Joined {formatDate(profile.createdAt)}</span>
+                  </div>
+                  {isOwn && (
+                    <button onClick={() => setEditing(true)} className="btn-ghost text-sm py-2 px-4 mt-4">
+                      Edit profile
+                    </button>
+                  )}
+                </>
+              )}
             </div>
           </div>
         </motion.div>
-
-        {files.length > 0 && (
-          <div>
-            <h2 className="section-title mb-5 flex items-center gap-2"><FileText size={20} className="text-accent" /> Uploaded Files</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-              {files.map(f => <FileCard key={f.id} file={f} />)}
-            </div>
-          </div>
-        )}
       </div>
-    </div>
+    </PageTransition>
   )
 }
