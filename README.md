@@ -1,162 +1,138 @@
-# Alrzrii Closet
+# Alrzrii Closet v2.0
 
-A production-grade creator portfolio & file release platform built with **React + Vite**, **Firebase**, and **Supabase Storage**.
+A production-ready portfolio, file sharing, and community platform built with:
 
-![Stack](https://img.shields.io/badge/React-18-61DAFB?logo=react) ![Firebase](https://img.shields.io/badge/Firebase-10-FFCA28?logo=firebase) ![Supabase](https://img.shields.io/badge/Supabase-Storage-3ECF8E?logo=supabase) ![TailwindCSS](https://img.shields.io/badge/TailwindCSS-3-06B6D4?logo=tailwindcss)
-
----
-
-## Features
-
-- 🔐 **Firebase Auth** — Email/password with persistent sessions
-- 📁 **File System** — Upload to Supabase Storage, metadata in Firestore
-- ❤️ **Likes** — Real-time like/unlike per file
-- 💬 **Comments + Replies** — Nested, real-time comment threads
-- 📢 **Dashboard** — Admin announcements with community replies
-- 🔎 **Search + Filter** — Search by name/tag, filter by category, sort by date/likes
-- 📊 **View counts** — Track file views automatically
-- 👑 **Role system** — Admin / User roles stored in Firestore (no hardcoded emails)
-- ⚙️ **Admin panel** — Manage users, categories, and hero content
-- 🎨 **Dark UI** — Framer Motion animations, Syne + DM Sans typography
-- 📦 **Drag & drop upload** — Progress bar, 100MB limit, unique filenames
-- 📱 **Fully responsive** — Mobile-first design
+- **React + Vite** — fast, modern frontend
+- **TailwindCSS** — utility-first dark design system
+- **Framer Motion** — smooth page transitions and animations
+- **Firebase** (Auth, Firestore, Storage) — full backend
+- **Zustand** — lightweight global state
 
 ---
 
-## Setup
+## 🚀 Quick Start
 
-### 1. Clone & Install
-
+### 1. Clone & install
 ```bash
 git clone https://github.com/hamad-alharmi/alrzrii-closet.git
 cd alrzrii-closet
 npm install
 ```
 
-### 2. Configure Firebase
+### 2. Set up Firebase
+1. Go to [Firebase Console](https://console.firebase.google.com)
+2. Create a new project
+3. Enable **Authentication** → Email/Password
+4. Enable **Firestore Database**
+5. Enable **Storage**
+6. Copy your config keys
 
-1. Go to [Firebase Console](https://console.firebase.google.com) → Create project
-2. Enable **Authentication** → Email/Password
-3. Enable **Firestore Database**
-4. Deploy Firestore rules: `firebase deploy --only firestore:rules`
-5. Copy your config from Project Settings
-
-### 3. Configure Supabase
-
-1. Go to [Supabase](https://supabase.com) → Create project
-2. Storage → Create bucket named `closet-files` (set to **public**)
-3. Set bucket policy to allow public reads and authenticated uploads
-4. Copy Project URL and Anon Key
-
-### 4. Environment Variables
-
-Copy `.env.example` to `.env.local` and fill in your credentials:
-
+### 3. Configure environment
 ```bash
-cp .env.example .env.local
+cp .env.example .env
+# Edit .env and fill in your Firebase values
 ```
 
-```env
-# Firebase
-VITE_FIREBASE_API_KEY=...
-VITE_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
-VITE_FIREBASE_PROJECT_ID=your-project-id
-VITE_FIREBASE_MESSAGING_SENDER_ID=...
-VITE_FIREBASE_APP_ID=...
-
-# Supabase
-VITE_SUPABASE_URL=https://xxxx.supabase.co
-VITE_SUPABASE_ANON_KEY=...
-VITE_SUPABASE_BUCKET=closet-files
+### 4. Deploy Firestore rules
+```bash
+npm install -g firebase-tools
+firebase login
+firebase use --add   # select your project
+firebase deploy --only firestore:rules,firestore:indexes,storage
 ```
 
-### 5. Run Locally
-
+### 5. Run locally
 ```bash
 npm run dev
 ```
 
 ---
 
-## Supabase Bucket Policy
+## 👤 First Admin Setup
 
-In Supabase Dashboard → Storage → `closet-files` → Policies, add:
+After signing up, manually set your user's role to `admin` in Firestore:
 
-**Allow public read:**
-```sql
-CREATE POLICY "Public read" ON storage.objects
-  FOR SELECT USING (bucket_id = 'closet-files');
-```
+1. Open **Firestore Console**
+2. Navigate to `users/{your-uid}`
+3. Change `role` field from `"user"` to `"admin"`
 
-**Allow authenticated upload:**
-```sql
-CREATE POLICY "Auth upload" ON storage.objects
-  FOR INSERT WITH CHECK (bucket_id = 'closet-files');
-```
+After that, you can promote/demote other users from the Admin Panel.
 
 ---
 
-## Making Yourself Admin
+## 📁 Project Structure
 
-1. Register an account at `/auth`
-2. In Firebase Console → Firestore → `users` collection
-3. Find your document (by UID)
-4. Edit `role` field from `"user"` to `"admin"`
-5. Refresh the app — Admin panel will appear in navbar
-
-After that, use the Admin Panel UI to promote/demote other users.
-
----
-
-## Deploy to Firebase Hosting
-
-```bash
-# Install Firebase CLI
-npm install -g firebase-tools
-
-# Login
-firebase login
-
-# Init (select Hosting, use existing project)
-firebase init
-
-# Build & Deploy
-npm run build
-firebase deploy
+```
+src/
+├── components/
+│   ├── admin/          # UploadModal, EditFileModal
+│   ├── auth/           # ProtectedRoute, AdminRoute
+│   ├── comments/       # CommentSection, CommentItem
+│   ├── files/          # FileCard, FileGrid, SearchBar, FilterBar, LikeButton
+│   ├── layout/         # Navbar
+│   └── ui/             # Modal, Spinner, EmptyState, PageTransition, PageLoader
+├── lib/
+│   ├── firebase.js     # Firebase init
+│   ├── formatters.js   # Date, bytes, image helpers
+│   └── uuid.js         # Lightweight UUID v4
+├── pages/
+│   ├── admin/          # AdminPanel, AdminFiles, AdminUsers, AdminCategories, AdminAnnouncements
+│   ├── auth/           # LoginPage, SignupPage
+│   ├── Community.jsx
+│   ├── FileDetail.jsx
+│   ├── FilesPage.jsx
+│   ├── Home.jsx
+│   └── ProfilePage.jsx
+├── services/           # All Firestore/Storage operations
+└── store/              # Zustand stores (auth, files)
 ```
 
 ---
 
-## Database Structure
+## ✨ Features
 
-| Collection | Key Fields |
-|---|---|
-| `users` | uid, email, role, createdAt |
-| `files` | title, description, category, tags, fileURL, fileName, fileSize, filePath, ownerUID, likesCount, viewCount |
-| `likes` | userId, fileId |
-| `comments` | fileId, authorUID, text |
-| `replies` | commentId, authorUID, text |
-| `messages` | authorUID, text |
-| `messageReplies` | messageId, authorUID, text |
-| `categories` | name, color |
-| `config/site` | heroTitle, heroSubtitle, heroTagline |
-
----
-
-## Tech Stack
-
-| Layer | Tech |
-|---|---|
-| Frontend | React 18 + Vite |
-| Styling | TailwindCSS 3 |
-| Animations | Framer Motion |
-| State | Zustand |
-| Auth + DB | Firebase v10 |
-| File Storage | Supabase Storage |
-| Routing | React Router v6 |
-| UI | Lucide Icons, React Hot Toast |
-| Fonts | Syne, DM Sans, JetBrains Mono |
+| Feature | Status |
+|---------|--------|
+| Auth (login/signup/persistent) | ✅ |
+| Role system (admin/user) | ✅ |
+| File upload with drag & drop + progress | ✅ |
+| Image preview | ✅ |
+| Download button | ✅ |
+| Like system (no duplicates) | ✅ |
+| Real-time comments + nested replies | ✅ |
+| Search + category filter + sort | ✅ |
+| Community announcements + replies | ✅ |
+| Admin: manage files/users/categories/announcements | ✅ |
+| User profile page + edit | ✅ |
+| View count per file | ✅ |
+| Toast notifications | ✅ |
+| Dark modern UI, fully responsive | ✅ |
+| Framer Motion animations | ✅ |
+| Firestore + Storage security rules | ✅ |
+| Lazy loading + code splitting | ✅ |
 
 ---
 
-Built with care by [alrzrii](https://github.com/hamad-alharmi) — not a school project.
+## 🚀 Deploy to Vercel
+
+1. Push to GitHub (already done)
+2. Go to [vercel.com](https://vercel.com) and import the repo
+3. Add all `VITE_FIREBASE_*` environment variables in Vercel project settings
+4. Deploy
+
+Vercel auto-deploys on every push to `main`.
+
+---
+
+## 🔒 Security Rules
+
+Rules are in `firestore.rules` and `storage.rules`:
+
+- Only **admins** can write files, categories
+- **Authenticated users** can comment, reply, like
+- Users can only edit/delete their **own** content
+- Admins can moderate all content
+
+---
+
+Built with ♥ for Alrzrii Closet
