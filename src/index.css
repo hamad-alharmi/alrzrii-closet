@@ -6,49 +6,54 @@
   * { box-sizing: border-box; }
   html { scroll-behavior: smooth; }
   body {
-    background-color: #050508;
-    color: #e8e8f0;
-    font-family: 'DM Sans', sans-serif;
-    -webkit-font-smoothing: antialiased;
-    overflow-x: hidden;
+    @apply bg-dark-900 text-white font-sans antialiased;
+    background-image: radial-gradient(ellipse at 20% 10%, rgba(124,58,237,0.06) 0%, transparent 60%),
+                      radial-gradient(ellipse at 80% 90%, rgba(168,85,247,0.04) 0%, transparent 60%);
+    min-height: 100vh;
   }
   ::-webkit-scrollbar { width: 6px; height: 6px; }
-  ::-webkit-scrollbar-track { background: #0d0d14; }
-  ::-webkit-scrollbar-thumb { background: #2a2a3e; border-radius: 3px; }
-  ::-webkit-scrollbar-thumb:hover { background: #7c6af7; }
+  ::-webkit-scrollbar-track { @apply bg-dark-800; }
+  ::-webkit-scrollbar-thumb { @apply bg-dark-400 rounded-full; }
+  ::-webkit-scrollbar-thumb:hover { @apply bg-accent; }
 }
 
 @layer components {
+  .card {
+    @apply bg-dark-700 border border-white/5 rounded-2xl shadow-card transition-all duration-300;
+  }
+  .card-hover {
+    @apply hover:border-accent/30 hover:shadow-card-hover hover:-translate-y-1;
+  }
   .btn-primary {
-    @apply bg-accent hover:bg-accent-glow text-white font-display font-semibold px-5 py-2.5 rounded-xl
-           transition-all duration-200 shadow-glow-sm hover:shadow-glow active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply bg-accent hover:bg-accent-light text-white font-semibold px-5 py-2.5 rounded-xl
+           transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed;
   }
   .btn-ghost {
-    @apply bg-transparent border border-border hover:border-accent text-text-secondary hover:text-text-primary
-           font-display font-medium px-5 py-2.5 rounded-xl transition-all duration-200 active:scale-95;
+    @apply bg-white/5 hover:bg-white/10 text-white/80 hover:text-white font-medium px-5 py-2.5
+           rounded-xl transition-all duration-200 active:scale-95;
   }
   .btn-danger {
-    @apply bg-crimson/10 hover:bg-crimson/20 border border-crimson/30 text-crimson
-           font-display font-medium px-4 py-2 rounded-xl transition-all duration-200 active:scale-95;
-  }
-  .card {
-    @apply bg-panel border border-border rounded-2xl overflow-hidden shadow-card
-           hover:border-accent/30 transition-all duration-300;
+    @apply bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 font-medium px-4 py-2
+           rounded-xl transition-all duration-200 border border-red-500/20;
   }
   .input {
-    @apply bg-surface border border-border text-text-primary placeholder-text-muted
-           rounded-xl px-4 py-2.5 w-full focus:outline-none focus:border-accent
-           transition-colors duration-200 font-body text-sm;
+    @apply bg-dark-600 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30
+           focus:outline-none focus:border-accent/60 focus:ring-1 focus:ring-accent/30
+           transition-all duration-200 w-full;
   }
-  .label { @apply text-text-secondary text-sm font-display font-medium mb-1.5 block; }
-  .badge { @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-medium; }
-  .section-title { @apply font-display font-bold text-2xl text-text-primary; }
-  .glass { @apply bg-panel/80 backdrop-blur-xl border border-border/50; }
-}
-
-@layer utilities {
-  .text-gradient {
-    @apply bg-gradient-to-r from-accent via-accent-glow to-purple-300 bg-clip-text text-transparent;
+  .badge {
+    @apply text-xs font-medium px-2.5 py-1 rounded-full;
   }
-  .glow-border { @apply border border-accent/50 shadow-glow-sm; }
+  .tag {
+    @apply badge bg-accent/10 text-accent-light border border-accent/20;
+  }
+  .section-title {
+    @apply text-2xl font-bold text-white;
+  }
+  .glass {
+    @apply bg-white/5 backdrop-blur-xl border border-white/10;
+  }
+  .glow-text {
+    @apply bg-gradient-to-r from-accent-light to-purple-300 bg-clip-text text-transparent;
+  }
 }

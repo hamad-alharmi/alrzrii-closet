@@ -1,64 +1,57 @@
-import React, { useEffect } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { Toaster } from 'react-hot-toast'
-import { useAuthStore } from '@/store/authStore'
-import Layout from '@/components/layout/Layout'
-import HomePage from '@/pages/HomePage'
-import FilesPage from '@/pages/FilesPage'
-import FileDetailPage from '@/pages/FileDetailPage'
-import DashboardPage from '@/pages/DashboardPage'
-import AdminPage from '@/pages/AdminPage'
-import AuthPage from '@/pages/AuthPage'
-import ProfilePage from '@/pages/ProfilePage'
-import LoadingScreen from '@/components/ui/LoadingScreen'
+import { useEffect, lazy, Suspense } from 'react'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { AnimatePresence } from 'framer-motion'
+import { useAuthStore } from './store/authStore'
+import Navbar from './components/layout/Navbar'
+import PageLoader from './components/ui/PageLoader'
+import ProtectedRoute from './components/auth/ProtectedRoute'
+import AdminRoute from './components/auth/AdminRoute'
 
-function ProtectedRoute({ children, adminOnly = false }) {
-  const { user, profile, loading } = useAuthStore()
-  if (loading) return <LoadingScreen />
-  if (!user) return <Navigate to="/auth" replace />
-  if (adminOnly && profile?.role !== 'admin') return <Navigate to="/" replace />
-  return children
-}
+const Home = lazy(() => import('./pages/Home'))
+const FilesPage = lazy(() => import('./pages/FilesPage'))
+const FileDetail = lazy(() => import('./pages/FileDetail'))
+const Community = lazy(() => import('./pages/Community'))
+const ProfilePage = lazy(() => import('./pages/ProfilePage'))
+const LoginPage = lazy(() => import('./pages/auth/LoginPage'))
+const SignupPage = lazy(() => import('./pages/auth/SignupPage'))
+const AdminPanel = lazy(() => import('./pages/admin/AdminPanel'))
+const AdminFiles = lazy(() => import('./pages/admin/AdminFiles'))
+const AdminUsers = lazy(() => import('./pages/admin/AdminUsers'))
+const AdminCategories = lazy(() => import('./pages/admin/AdminCategories'))
+const AdminAnnouncements = lazy(() => import('./pages/admin/AdminAnnouncements'))
 
 export default function App() {
-  const init = useAuthStore(s => s.init)
-  const loading = useAuthStore(s => s.loading)
+  const location = useLocation()
+  const { init, loading } = useAuthStore()
 
-  useEffect(() => {
-    const unsub = init()
-    return () => unsub?.()
-  }, [init])
+  useEffect(() => { init() }, [init])
 
-  if (loading) return <LoadingScreen />
+  if (loading) return <PageLoader />
 
   return (
-    <BrowserRouter>
-      <Toaster
-        position="bottom-right"
-        toastOptions={{
-          style: {
-            background: '#12121c',
-            color: '#e8e8f0',
-            border: '1px solid #1e1e2e',
-            borderRadius: '12px',
-            fontFamily: 'DM Sans, sans-serif',
-          },
-          success: { iconTheme: { primary: '#10b981', secondary: '#050508' } },
-          error: { iconTheme: { primary: '#ef4444', secondary: '#050508' } },
-        }}
-      />
-      <Routes>
-        <Route path="/auth" element={<AuthPage />} />
-        <Route element={<Layout />}>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/files" element={<FilesPage />} />
-          <Route path="/files/:id" element={<FileDetailPage />} />
-          <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
-          <Route path="/admin" element={<ProtectedRoute adminOnly><AdminPage /></ProtectedRoute>} />
-          <Route path="/profile/:uid" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
-        </Route>
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </BrowserRouter>
+    <div className="min-h-screen">
+      <Navbar />
+      <AnimatePresence mode="wait">
+        <Suspense fallback={<PageLoader />}>
+          <Routes location={location} key={location.pathname}>
+            <Route path="/" element={<Home />} />
+            <Route path="/files" element={<FilesPage />} />
+            <Route path="/files/:id" element={<FileDetail />} />
+            <Route path="/community" element={<Community />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/signup" element={<SignupPage />} />
+            <Route path="/profile/:uid" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+            <Route path="/admin" element={<AdminRoute><AdminPanel /></AdminRoute>}>
+              <Route index element={<Navigate to="files" replace />} />
+              <Route path="files" element={<AdminFiles />} />
+              <Route path="users" element={<AdminUsers />} />
+              <Route path="categories" element={<AdminCategories />} />
+              <Route path="announcements" element={<AdminAnnouncements />} />
+            </Route>
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Suspense>
+      </AnimatePresence>
+    </div>
   )
 }
