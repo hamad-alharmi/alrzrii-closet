@@ -2,18 +2,16 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper: is the requesting user an admin?
     function isAdmin() {
       return request.auth != null &&
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
-    // Helper: is the user authenticated?
     function isAuth() {
       return request.auth != null;
     }
 
-    // Users collection
+    // Users
     match /users/{userId} {
       allow read: if isAuth();
       allow create: if request.auth.uid == userId;
@@ -21,49 +19,50 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // Files collection — admins write, authenticated users read
+    // Files — admins write, anyone reads
     match /files/{fileId} {
       allow read: if true;
       allow create, update, delete: if isAdmin();
 
-      // Comments subcollection
+      // Comments — any authenticated user can create
       match /comments/{commentId} {
         allow read: if true;
-        allow create: if isAuth() && request.resource.data.authorId == request.auth.uid;
+        allow create: if isAuth();
         allow update, delete: if isAuth() &&
           (resource.data.authorId == request.auth.uid || isAdmin());
 
-        // Replies subcollection
+        // Replies — any authenticated user can create
         match /replies/{replyId} {
           allow read: if true;
-          allow create: if isAuth() && request.resource.data.authorId == request.auth.uid;
+          allow create: if isAuth();
           allow update, delete: if isAuth() &&
             (resource.data.authorId == request.auth.uid || isAdmin());
         }
       }
 
-      // Likes subcollection
+      // Likes — user can only write their own like doc
       match /likes/{userId} {
         allow read: if true;
         allow write: if isAuth() && request.auth.uid == userId;
       }
     }
 
-    // Categories — admin writes, everyone reads
+    // Categories — admin writes, anyone reads
     match /categories/{catId} {
       allow read: if true;
       allow write: if isAdmin();
     }
 
-    // Announcements — admin writes, everyone reads
+    // Announcements — admin creates/updates/deletes the announcement itself
+    // BUT any authenticated user can read AND create replies
     match /announcements/{annId} {
       allow read: if true;
       allow create, update, delete: if isAdmin();
 
-      // Replies on announcements
+      // Replies — open to ALL authenticated users (any role)
       match /replies/{replyId} {
         allow read: if true;
-        allow create: if isAuth() && request.resource.data.authorId == request.auth.uid;
+        allow create: if isAuth();
         allow update, delete: if isAuth() &&
           (resource.data.authorId == request.auth.uid || isAdmin());
       }
