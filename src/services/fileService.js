@@ -1,5 +1,5 @@
 import {
-  collection, doc, addDoc, updateDoc, deleteDoc,
+  collection, doc, addDoc, updateDoc, deleteDoc, setDoc,
   getDoc, getDocs, query, orderBy, limit,
   where, serverTimestamp, increment,
 } from 'firebase/firestore'
@@ -18,24 +18,32 @@ export async function uploadFile(file, metadata, onProgress) {
   return new Promise((resolve, reject) => {
     task.on(
       'state_changed',
-      (snap) => onProgress && onProgress(Math.round((snap.bytesTransferred / snap.totalBytes) * 100)),
-      reject,
+      (snap) => {
+        if (snap.totalBytes > 0) {
+          onProgress && onProgress(Math.round((snap.bytesTransferred / snap.totalBytes) * 100))
+        }
+      },
+      (err) => reject(err),
       async () => {
-        const url = await getDownloadURL(task.snapshot.ref)
-        const docRef = await addDoc(collection(db, 'files'), {
-          ...metadata,
-          fileURL: url,
-          storagePath: `files/${uniqueName}`,
-          size: file.size,
-          originalName: file.name,
-          contentType: file.type,
-          likesCount: 0,
-          viewsCount: 0,
-          commentsCount: 0,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        })
-        resolve(docRef.id)
+        try {
+          const url = await getDownloadURL(task.snapshot.ref)
+          const docRef = await addDoc(collection(db, 'files'), {
+            ...metadata,
+            fileURL: url,
+            storagePath: `files/${uniqueName}`,
+            size: file.size,
+            originalName: file.name,
+            contentType: file.type,
+            likesCount: 0,
+            viewsCount: 0,
+            commentsCount: 0,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          })
+          resolve(docRef.id)
+        } catch (err) {
+          reject(err)
+        }
       }
     )
   })
@@ -50,7 +58,7 @@ export async function deleteFile(id) {
   if (snap.exists()) {
     const { storagePath } = snap.data()
     if (storagePath) {
-      try { await deleteObject(ref(storage, storagePath)) } catch {}
+      try { await deleteObject(ref(storage, storagePath)) } catch (_) {}
     }
   }
   await deleteDoc(doc(db, 'files', id))
@@ -79,7 +87,8 @@ export async function getFiles({ category, sort = 'newest', pageSize = 20 } = {}
 export async function getFileById(id) {
   const snap = await getDoc(doc(db, 'files', id))
   if (!snap.exists()) return null
-  await updateDoc(doc(db, 'files', id), { viewsCount: increment(1) })
+  // increment view count but don't await it — don't block page load
+  updateDoc(doc(db, 'files', id), { viewsCount: increment(1) }).catch(() => {})
   return { id: snap.id, ...snap.data() }
 }
 
