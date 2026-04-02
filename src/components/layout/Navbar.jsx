@@ -1,150 +1,173 @@
-import React, { useState, useEffect } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useState } from 'react'
+import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useAuthStore } from '@/store/authStore'
-import { Home, FolderOpen, LayoutDashboard, ShieldCheck, LogIn, LogOut, Menu, X, User, ChevronDown } from 'lucide-react'
+import { Menu, X, Shield, LogOut, User, Folder, Home, Users } from 'lucide-react'
+import { useAuthStore } from '../../store/authStore'
+import { logoutUser } from '../../services/authService'
 import toast from 'react-hot-toast'
 
 const navLinks = [
   { to: '/', label: 'Home', icon: Home },
-  { to: '/files', label: 'Files', icon: FolderOpen },
-  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, auth: true },
+  { to: '/files', label: 'Files', icon: Folder },
+  { to: '/community', label: 'Community', icon: Users },
 ]
 
 export default function Navbar() {
-  const { user, profile, logout } = useAuthStore()
-  const location = useLocation()
-  const navigate = useNavigate()
-  const [mobileOpen, setMobileOpen] = useState(false)
-  const [scrolled, setScrolled] = useState(false)
-  const [userMenuOpen, setUserMenuOpen] = useState(false)
-
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 20)
-    window.addEventListener('scroll', onScroll)
-    return () => window.removeEventListener('scroll', onScroll)
-  }, [])
-
-  useEffect(() => { setMobileOpen(false); setUserMenuOpen(false) }, [location.pathname])
-
-  const handleLogout = async () => { await logout(); toast.success('Signed out'); navigate('/') }
+  const [open, setOpen] = useState(false)
+  const [dropdownOpen, setDropdownOpen] = useState(false)
+  const { user, profile } = useAuthStore()
   const isAdmin = profile?.role === 'admin'
+  const navigate = useNavigate()
+
+  const handleLogout = async () => {
+    await logoutUser()
+    toast.success('Logged out')
+    navigate('/')
+    setDropdownOpen(false)
+  }
 
   return (
-    <motion.header
-      initial={{ y: -20, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      transition={{ duration: 0.5 }}
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        scrolled ? 'bg-void/90 backdrop-blur-xl border-b border-border/50' : 'bg-transparent'
-      }`}
-    >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          <Link to="/" className="flex items-center gap-2 group">
-            <div className="w-8 h-8 rounded-lg bg-accent/20 border border-accent/40 flex items-center justify-center group-hover:bg-accent/30 transition-colors">
-              <span className="text-accent font-display font-bold text-sm">A</span>
-            </div>
-            <span className="font-display font-bold text-text-primary text-lg tracking-tight">
-              alrzrii<span className="text-accent">.</span>
-            </span>
-          </Link>
-
-          <nav className="hidden md:flex items-center gap-1">
-            {navLinks.map(({ to, label, icon: Icon, auth }) => {
-              if (auth && !user) return null
-              const active = location.pathname === to || (to !== '/' && location.pathname.startsWith(to))
-              return (
-                <Link key={to} to={to} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-display font-medium transition-all duration-200 ${
-                  active ? 'bg-accent/15 text-accent' : 'text-text-secondary hover:text-text-primary hover:bg-white/5'
-                }`}>
-                  <Icon size={15} />{label}
-                </Link>
-              )
-            })}
-            {isAdmin && (
-              <Link to="/admin" className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-display font-medium transition-all duration-200 ${
-                location.pathname === '/admin' ? 'bg-ember/15 text-ember' : 'text-text-secondary hover:text-ember hover:bg-ember/5'
-              }`}>
-                <ShieldCheck size={15} />Admin
-              </Link>
-            )}
-          </nav>
-
-          <div className="hidden md:flex items-center gap-3">
-            {user ? (
-              <div className="relative">
-                <button onClick={() => setUserMenuOpen(o => !o)} className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-border hover:border-accent/40 transition-all duration-200">
-                  <div className="w-6 h-6 rounded-full bg-accent/20 flex items-center justify-center">
-                    <User size={12} className="text-accent" />
-                  </div>
-                  <span className="text-sm text-text-secondary font-display max-w-[120px] truncate">{user.email?.split('@')[0]}</span>
-                  {isAdmin && <span className="text-xs bg-ember/15 text-ember px-1.5 py-0.5 rounded-md font-mono">admin</span>}
-                  <ChevronDown size={13} className={`text-text-muted transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} />
-                </button>
-                <AnimatePresence>
-                  {userMenuOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 6, scale: 0.96 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: 4, scale: 0.95 }}
-                      transition={{ duration: 0.15 }}
-                      className="absolute right-0 top-full mt-2 w-48 bg-panel border border-border rounded-xl shadow-card overflow-hidden z-50"
-                    >
-                      <Link to={`/profile/${user.uid}`} className="flex items-center gap-2 px-4 py-2.5 text-sm text-text-secondary hover:text-text-primary hover:bg-white/5 transition-colors">
-                        <User size={14} /> My Profile
-                      </Link>
-                      <div className="border-t border-border/50" />
-                      <button onClick={handleLogout} className="flex items-center gap-2 px-4 py-2.5 text-sm text-crimson hover:bg-crimson/5 w-full transition-colors">
-                        <LogOut size={14} /> Sign Out
-                      </button>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            ) : (
-              <Link to="/auth" className="btn-primary text-sm py-2"><LogIn size={14} className="inline mr-1.5" />Sign In</Link>
-            )}
+    <header className="sticky top-0 z-50 glass border-b border-white/5">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+        {/* Logo */}
+        <Link to="/" className="flex items-center gap-2.5 group">
+          <div className="w-8 h-8 rounded-lg bg-accent flex items-center justify-center text-sm font-bold group-hover:shadow-glow transition-all">
+            AC
           </div>
+          <span className="font-bold text-lg tracking-tight hidden sm:block">
+            Alrzrii <span className="glow-text">Closet</span>
+          </span>
+        </Link>
 
-          <button onClick={() => setMobileOpen(o => !o)} className="md:hidden p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-white/5">
-            {mobileOpen ? <X size={20} /> : <Menu size={20} />}
+        {/* Desktop nav */}
+        <nav className="hidden md:flex items-center gap-1">
+          {navLinks.map(({ to, label }) => (
+            <NavLink
+              key={to}
+              to={to}
+              end={to === '/'}
+              className={({ isActive }) =>
+                `px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  isActive ? 'bg-accent/15 text-accent-light' : 'text-white/60 hover:text-white hover:bg-white/5'
+                }`
+              }
+            >
+              {label}
+            </NavLink>
+          ))}
+          {isAdmin && (
+            <NavLink
+              to="/admin"
+              className={({ isActive }) =>
+                `px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5 transition-all ${
+                  isActive ? 'bg-accent/15 text-accent-light' : 'text-white/60 hover:text-white hover:bg-white/5'
+                }`
+              }
+            >
+              <Shield size={14} /> Admin
+            </NavLink>
+          )}
+        </nav>
+
+        {/* Right section */}
+        <div className="flex items-center gap-2">
+          {user ? (
+            <div className="relative">
+              <button
+                onClick={() => setDropdownOpen(!dropdownOpen)}
+                className="flex items-center gap-2 hover:bg-white/5 px-3 py-2 rounded-xl transition-all"
+              >
+                <div className="w-7 h-7 rounded-full bg-accent/20 flex items-center justify-center text-xs font-bold text-accent-light">
+                  {(profile?.displayName || user.email)?.[0]?.toUpperCase()}
+                </div>
+                <span className="hidden sm:block text-sm text-white/80 max-w-[120px] truncate">
+                  {profile?.displayName || user.email}
+                </span>
+              </button>
+              <AnimatePresence>
+                {dropdownOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -8, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -8, scale: 0.95 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute right-0 top-full mt-2 w-48 card shadow-xl z-50"
+                  >
+                    <div className="p-1">
+                      <Link
+                        to={`/profile/${user.uid}`}
+                        onClick={() => setDropdownOpen(false)}
+                        className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-white/70 hover:text-white hover:bg-white/5 transition-all"
+                      >
+                        <User size={14} /> Profile
+                      </Link>
+                      <button
+                        onClick={handleLogout}
+                        className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-red-400 hover:bg-red-500/10 w-full transition-all"
+                      >
+                        <LogOut size={14} /> Log out
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          ) : (
+            <div className="hidden md:flex items-center gap-2">
+              <Link to="/login" className="btn-ghost text-sm py-2">Sign in</Link>
+              <Link to="/signup" className="btn-primary text-sm py-2">Join free</Link>
+            </div>
+          )}
+
+          {/* Mobile toggle */}
+          <button
+            onClick={() => setOpen(!open)}
+            className="md:hidden p-2 rounded-lg hover:bg-white/5 transition-all"
+          >
+            {open ? <X size={20} /> : <Menu size={20} />}
           </button>
         </div>
       </div>
 
+      {/* Mobile menu */}
       <AnimatePresence>
-        {mobileOpen && (
+        {open && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            className="md:hidden bg-void/95 backdrop-blur-xl border-b border-border overflow-hidden"
+            className="md:hidden border-t border-white/5 bg-dark-800"
           >
-            <div className="px-4 py-4 space-y-1">
-              {navLinks.map(({ to, label, icon: Icon, auth }) => {
-                if (auth && !user) return null
-                const active = location.pathname === to
-                return (
-                  <Link key={to} to={to} className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-display font-medium transition-all ${
-                    active ? 'bg-accent/15 text-accent' : 'text-text-secondary'
-                  }`}>
-                    <Icon size={16} /> {label}
+            <div className="px-4 py-3 flex flex-col gap-1">
+              {navLinks.map(({ to, label, icon: Icon }) => (
+                <NavLink
+                  key={to}
+                  to={to}
+                  end={to === '/'}
+                  onClick={() => setOpen(false)}
+                  className={({ isActive }) =>
+                    `flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                      isActive ? 'bg-accent/15 text-accent-light' : 'text-white/60 hover:text-white'
+                    }`
+                  }
+                >
+                  <Icon size={16} /> {label}
+                </NavLink>
+              ))}
+              {!user && (
+                <div className="flex gap-2 pt-2">
+                  <Link to="/login" onClick={() => setOpen(false)} className="btn-ghost text-sm flex-1 text-center">
+                    Sign in
                   </Link>
-                )
-              })}
-              {isAdmin && <Link to="/admin" className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-display font-medium text-text-secondary hover:text-ember"><ShieldCheck size={16} /> Admin Panel</Link>}
-              <div className="pt-2 border-t border-border/50">
-                {user ? (
-                  <button onClick={handleLogout} className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-crimson w-full"><LogOut size={16} /> Sign Out</button>
-                ) : (
-                  <Link to="/auth" className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-display text-accent"><LogIn size={16} /> Sign In</Link>
-                )}
-              </div>
+                  <Link to="/signup" onClick={() => setOpen(false)} className="btn-primary text-sm flex-1 text-center">
+                    Join free
+                  </Link>
+                </div>
+              )}
             </div>
           </motion.div>
         )}
       </AnimatePresence>
-    </motion.header>
+    </header>
   )
 }
