@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Megaphone, Send, ChevronDown, ChevronUp, Trash2, LogIn } from 'lucide-react'
 import { Link } from 'react-router-dom'
@@ -20,51 +20,51 @@ function AnnouncementCard({ ann, isAdmin }) {
   const [replies, setReplies] = useState([])
   const [replyText, setReplyText] = useState('')
   const [submitting, setSubmitting] = useState(false)
-  // Keep subscription alive as long as the card is mounted once expanded
-  const subscribedRef = useRef(false)
+
+  // Keep the unsub fn in a ref so it survives re-renders without being a dependency
   const unsubRef = useRef(null)
 
-  // Subscribe to replies permanently once the card is first expanded
+  // Subscribe once when first expanded, stay subscribed until unmount
   useEffect(() => {
-    if (expanded && !subscribedRef.current) {
-      subscribedRef.current = true
-      unsubRef.current = subscribeAnnouncementReplies(ann.id, setReplies)
-    }
-    return () => {
-      // Only unsub when the component unmounts entirely
+    if (expanded && !unsubRef.current) {
+      unsubRef.current = subscribeAnnouncementReplies(ann.id, (data) => {
+        setReplies(data)
+      })
     }
   }, [expanded, ann.id])
 
-  // Cleanup on unmount
+  // Unsubscribe only on unmount
   useEffect(() => {
     return () => {
-      if (unsubRef.current) unsubRef.current()
+      if (unsubRef.current) {
+        unsubRef.current()
+        unsubRef.current = null
+      }
     }
   }, [])
 
-  const handleReply = async (e) => {
+  const handleReply = useCallback(async (e) => {
     e.preventDefault()
-    if (!replyText.trim()) return
+    const text = replyText.trim()
+    if (!text) return
     if (!user) return toast.error('Sign in to reply')
     setSubmitting(true)
     try {
       await addAnnouncementReply(
         ann.id,
         user.uid,
-        profile?.displayName || user.email,
-        replyText.trim()
+        profile?.displayName || user.email || 'Anonymous',
+        text
       )
       setReplyText('')
       toast.success('Reply posted!')
     } catch (err) {
-      console.error('Reply error:', err)
-      toast.error('Failed to post reply')
+      console.error('addAnnouncementReply error:', err)
+      toast.error(`Failed to post reply: ${err.message}`)
     } finally {
       setSubmitting(false)
     }
-  }
-
-  const toggleExpanded = () => setExpanded(prev => !prev)
+  }, [ann.id, replyText, user, profile])
 
   return (
     <motion.div
@@ -76,12 +76,14 @@ function AnnouncementCard({ ann, isAdmin }) {
       <div className="p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-2">
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
               <span className="badge bg-accent/15 text-accent-light border border-accent/20 text-xs">
                 <Megaphone size={10} className="inline mr-1" />Announcement
               </span>
               <span className="text-xs text-white/30">{formatRelative(ann.createdAt)}</span>
-              <span className="text-xs text-white/20">by {ann.authorName}</span>
+              {ann.authorName && (
+                <span className="text-xs text-white/20">by {ann.authorName}</span>
+              )}
             </div>
             <h3 className="font-semibold text-white mb-1">{ann.title}</h3>
             <p className="text-white/50 text-sm leading-relaxed">{ann.body}</p>
@@ -90,23 +92,23 @@ function AnnouncementCard({ ann, isAdmin }) {
           <div className="flex items-center gap-2 flex-shrink-0">
             {isAdmin && (
               <button
-                onClick={() => deleteAnnouncement(ann.id).catch(() => toast.error('Delete failed'))}
+                onClick={() =>
+                  deleteAnnouncement(ann.id).catch(() => toast.error('Delete failed'))
+                }
                 className="p-1.5 hover:bg-red-500/10 text-white/20 hover:text-red-400 rounded-lg transition-all"
-                title="Delete announcement"
+                title="Delete"
               >
                 <Trash2 size={14} />
               </button>
             )}
             <button
-              onClick={toggleExpanded}
+              onClick={() => setExpanded(v => !v)}
               className="flex items-center gap-1.5 text-xs text-white/40 hover:text-white transition-colors px-2.5 py-1.5 hover:bg-white/5 rounded-lg border border-white/5"
             >
               {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-              <span>
-                {replies.length > 0
-                  ? `${replies.length} repl${replies.length === 1 ? 'y' : 'ies'}`
-                  : 'Replies'}
-              </span>
+              {replies.length > 0
+                ? `${replies.length} repl${replies.length === 1 ? 'y' : 'ies'}`
+                : 'Replies'}
             </button>
           </div>
         </div>
@@ -115,18 +117,18 @@ function AnnouncementCard({ ann, isAdmin }) {
       <AnimatePresence initial={false}>
         {expanded && (
           <motion.div
-            key="replies-panel"
+            key="panel"
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.2 }}
             style={{ overflow: 'hidden' }}
           >
-            <div className="border-t border-white/5 bg-dark-800 p-4">
+            <div className="border-t border-white/5 bg-dark-800 p-4 flex flex-col gap-4">
 
               {/* Replies list */}
               {replies.length > 0 ? (
-                <div className="flex flex-col gap-3 mb-4">
+                <div className="flex flex-col gap-3">
                   {replies.map(r => (
                     <div key={r.id} className="flex gap-2.5">
                       <div className="w-7 h-7 rounded-full bg-accent/20 flex items-center justify-center text-xs font-bold flex-shrink-0 text-accent-light">
@@ -134,8 +136,12 @@ function AnnouncementCard({ ann, isAdmin }) {
                       </div>
                       <div>
                         <div className="flex items-baseline gap-2">
-                          <span className="text-xs font-semibold text-white/80">{r.authorName}</span>
-                          <span className="text-xs text-white/25">{formatRelative(r.createdAt)}</span>
+                          <span className="text-xs font-semibold text-white/80">
+                            {r.authorName}
+                          </span>
+                          <span className="text-xs text-white/25">
+                            {formatRelative(r.createdAt)}
+                          </span>
                         </div>
                         <p className="text-white/60 text-sm mt-0.5">{r.text}</p>
                       </div>
@@ -143,10 +149,10 @@ function AnnouncementCard({ ann, isAdmin }) {
                   ))}
                 </div>
               ) : (
-                <p className="text-white/25 text-xs mb-4">No replies yet — be the first!</p>
+                <p className="text-white/25 text-xs">No replies yet — be the first!</p>
               )}
 
-              {/* Reply input — any authenticated user */}
+              {/* Reply input */}
               {user ? (
                 <form onSubmit={handleReply} className="flex gap-2">
                   <div className="w-7 h-7 rounded-full bg-accent/20 flex items-center justify-center text-xs font-bold flex-shrink-0 text-accent-light mt-1">
@@ -171,7 +177,9 @@ function AnnouncementCard({ ann, isAdmin }) {
               ) : (
                 <div className="flex items-center gap-2 text-sm text-white/30">
                   <LogIn size={14} />
-                  <Link to="/login" className="text-accent-light hover:underline">Sign in</Link>
+                  <Link to="/login" className="text-accent-light hover:underline">
+                    Sign in
+                  </Link>
                   <span>to join the conversation</span>
                 </div>
               )}
@@ -198,7 +206,7 @@ export default function Community() {
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-10">
         <div className="mb-8">
           <h1 className="section-title mb-1">Community Hub</h1>
-          <p className="text-white/40">Announcements and discussions — open to everyone</p>
+          <p className="text-white/40">Announcements and open discussions</p>
         </div>
 
         {announcements.length === 0 ? (
