@@ -7,47 +7,50 @@ import { db } from '../lib/firebase'
 import { supabase } from '../lib/supabase'
 import { v4 as uuid } from '../lib/uuid'
 
-// ─── Upload via Supabase Storage ────────────────────────────────────────────
+// ─── Upload via Supabase Storage ─────────────────────────────────────────────
 export async function uploadFile(file, metadata, onProgress) {
-  const ext = file.name.split('.').pop()
+  if (!supabase) {
+    throw new Error(
+      'Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your environment variables.'
+    )
+  }
+
+  const ext        = file.name.split('.').pop()
   const uniqueName = `${uuid()}.${ext}`
   const storagePath = `uploads/${uniqueName}`
 
-  // Supabase JS v2 doesn't expose upload progress natively,
-  // so we simulate 0 → 100 around the upload call.
   onProgress && onProgress(10)
 
-  const { data, error } = await supabase.storage
+  const { error: uploadError } = await supabase.storage
     .from('files')
     .upload(storagePath, file, {
       cacheControl: '3600',
       upsert: false,
-      contentType: file.type,
+      contentType: file.type || 'application/octet-stream',
     })
 
-  if (error) throw error
+  if (uploadError) throw new Error(`Storage upload failed: ${uploadError.message}`)
 
-  onProgress && onProgress(80)
+  onProgress && onProgress(75)
 
-  // Get the public URL (bucket is public)
   const { data: urlData } = supabase.storage
     .from('files')
     .getPublicUrl(storagePath)
 
   const fileURL = urlData.publicUrl
+  if (!fileURL) throw new Error('Could not get public URL from Supabase')
 
-  onProgress && onProgress(95)
+  onProgress && onProgress(90)
 
-  // Write metadata to Firestore
   const docRef = await addDoc(collection(db, 'files'), {
     ...metadata,
     fileURL,
     storagePath,
-    size: file.size,
+    size:         file.size,
     originalName: file.name,
-    contentType: file.type || '',
-    likesCount: 0,
-    viewsCount: 0,
+    contentType:  file.type || '',
+    likesCount:    0,
+    viewsCount:    0,
     commentsCount: 0,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
@@ -57,15 +60,15 @@ export async function uploadFile(file, metadata, onProgress) {
   return docRef.id
 }
 
-// ─── Update metadata in Firestore ────────────────────────────────────────────
+// ─── Update metadata ──────────────────────────────────────────────────────────
 export async function updateFileMeta(id, data) {
   await updateDoc(doc(db, 'files', id), { ...data, updatedAt: serverTimestamp() })
 }
 
-// ─── Delete file from Supabase + Firestore ───────────────────────────────────
+// ─── Delete file from Supabase + Firestore ────────────────────────────────────
 export async function deleteFile(id) {
   const snap = await getDoc(doc(db, 'files', id))
-  if (snap.exists()) {
+  if (snap.exists() && supabase) {
     const { storagePath } = snap.data()
     if (storagePath) {
       await supabase.storage.from('files').remove([storagePath]).catch(() => {})
@@ -76,8 +79,8 @@ export async function deleteFile(id) {
 
 // ─── Query files ──────────────────────────────────────────────────────────────
 export async function getFiles({ category, sort = 'newest', pageSize = 20 } = {}) {
-  let q
   const sortField = sort === 'liked' ? 'likesCount' : 'createdAt'
+  let q
   if (category && category !== 'all') {
     q = query(
       collection(db, 'files'),
@@ -100,7 +103,6 @@ export async function getFiles({ category, sort = 'newest', pageSize = 20 } = {}
 export async function getFileById(id) {
   const snap = await getDoc(doc(db, 'files', id))
   if (!snap.exists()) return null
-  // fire-and-forget view increment
   updateDoc(doc(db, 'files', id), { viewsCount: increment(1) }).catch(() => {})
   return { id: snap.id, ...snap.data() }
 }

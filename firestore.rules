@@ -19,7 +19,7 @@ service cloud.firestore {
       allow update, delete: if request.auth != null &&
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
 
-      // 💬 COMMENTS — any signed-in user can comment
+      // 💬 COMMENTS — any signed-in user can post
       match /comments/{commentId} {
         allow read: if true;
         allow create: if request.auth != null;
@@ -37,7 +37,7 @@ service cloud.firestore {
       }
     }
 
-    // 📂 CATEGORIES (admin only)
+    // 📂 CATEGORIES
     match /categories/{id} {
       allow read: if true;
       allow write: if request.auth != null &&
@@ -45,14 +45,14 @@ service cloud.firestore {
     }
 
     // 📢 ANNOUNCEMENTS
-    // Admins create/update/delete the announcement itself
-    // BUT any signed-in user can reply (replies subcollection)
-    match /announcements/{id} {
+    // Admins write the announcement itself.
+    // Any signed-in user can reply (replies subcollection).
+    match /announcements/{annId} {
       allow read: if true;
       allow create, update, delete: if request.auth != null &&
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
 
-      // 💬 REPLIES — open to ALL signed-in users (user or admin)
+      // 💬 REPLIES — open to every signed-in user
       match /replies/{replyId} {
         allow read: if true;
         allow create: if request.auth != null;
@@ -63,5 +63,6 @@ service cloud.firestore {
           );
       }
     }
+
   }
 }

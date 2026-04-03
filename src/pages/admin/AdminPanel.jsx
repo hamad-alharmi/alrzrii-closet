@@ -1,18 +1,18 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { useLocation, NavLink, Outlet } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import {
-  UploadCloud, Users, Tag, Megaphone, LayoutDashboard
-} from 'lucide-react'
+import { UploadCloud, Users, Tag, Megaphone, LayoutDashboard } from 'lucide-react'
 import PageTransition from '../../components/ui/PageTransition'
 
 const links = [
-  { to: '/admin/files',         label: 'Files',         icon: UploadCloud },
-  { to: '/admin/users',         label: 'Users',         icon: Users },
-  { to: '/admin/categories',    label: 'Categories',    icon: Tag },
-  { to: '/admin/announcements', label: 'Announcements', icon: Megaphone },
+  { to: '/admin/files',         label: 'Files',         icon: UploadCloud  },
+  { to: '/admin/users',         label: 'Users',         icon: Users        },
+  { to: '/admin/categories',    label: 'Categories',    icon: Tag          },
+  { to: '/admin/announcements', label: 'Announcements', icon: Megaphone    },
 ]
 
 export default function AdminPanel() {
+  const location = useLocation()
+
   return (
     <PageTransition>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10">
