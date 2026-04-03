@@ -10,6 +10,7 @@ import toast from 'react-hot-toast'
 
 export default function UploadModal({ open, onClose }) {
   const { categories, fetchFiles } = useFilesStore()
+
   const [file, setFile] = useState(null)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -18,10 +19,16 @@ export default function UploadModal({ open, onClose }) {
   const [progress, setProgress] = useState(0)
   const [uploading, setUploading] = useState(false)
   const [done, setDone] = useState(false)
+  const [error, setError] = useState('')
 
-  const onDrop = useCallback((accepted) => {
+  const onDrop = useCallback((accepted, rejected) => {
+    if (rejected?.length) {
+      toast.error(`File rejected: ${rejected[0].errors[0]?.message || 'unknown error'}`)
+      return
+    }
     if (accepted[0]) {
       setFile(accepted[0])
+      setError('')
       if (!title) setTitle(accepted[0].name.replace(/\.[^.]+$/, ''))
     }
   }, [title])
@@ -29,34 +36,40 @@ export default function UploadModal({ open, onClose }) {
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     multiple: false,
-    maxSize: 100 * 1024 * 1024, // 100MB
+    maxSize: 100 * 1024 * 1024,
   })
 
   const handleUpload = async () => {
-    if (!file || !title.trim()) return toast.error('File and title are required')
+    if (!file) return toast.error('Please select a file')
+    if (!title.trim()) return toast.error('Title is required')
+
     setUploading(true)
     setProgress(0)
+    setError('')
+
     try {
       const tags = tagsRaw.split(',').map(t => t.trim()).filter(Boolean)
       await uploadFile(
         file,
-        { title: title.trim(), description, category, tags },
+        { title: title.trim(), description: description.trim(), category, tags },
         setProgress
       )
       setDone(true)
-      toast.success('File uploaded!')
+      toast.success('File uploaded successfully!')
       await fetchFiles()
-      setTimeout(() => {
-        handleClose()
-      }, 1200)
+      setTimeout(handleClose, 1500)
     } catch (err) {
-      toast.error(err.message || 'Upload failed')
+      console.error('Upload error:', err)
+      const msg = err?.message || 'Upload failed. Check console for details.'
+      setError(msg)
+      toast.error(msg)
     } finally {
       setUploading(false)
     }
   }
 
   const handleClose = () => {
+    if (uploading) return
     setFile(null)
     setTitle('')
     setDescription('')
@@ -64,16 +77,18 @@ export default function UploadModal({ open, onClose }) {
     setTagsRaw('')
     setProgress(0)
     setDone(false)
+    setError('')
     onClose()
   }
 
   return (
     <Modal open={open} onClose={handleClose} title="Upload File" maxWidth="max-w-xl">
       <div className="flex flex-col gap-4">
+
         {/* Dropzone */}
         <div
           {...getRootProps()}
-          className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all ${
+          className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all select-none ${
             isDragActive
               ? 'border-accent bg-accent/10'
               : file
@@ -85,34 +100,38 @@ export default function UploadModal({ open, onClose }) {
           <AnimatePresence mode="wait">
             {file ? (
               <motion.div
-                key="file"
+                key="has-file"
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
                 className="flex flex-col items-center gap-2"
               >
                 <FileIcon size={32} className="text-accent-light" />
-                <p className="font-medium text-sm">{file.name}</p>
+                <p className="font-medium text-sm text-white truncate max-w-full px-4">
+                  {file.name}
+                </p>
                 <p className="text-xs text-white/40">{formatBytes(file.size)}</p>
                 <button
                   type="button"
-                  onClick={(e) => { e.stopPropagation(); setFile(null) }}
-                  className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300 mt-1"
+                  onClick={e => { e.stopPropagation(); setFile(null); setTitle('') }}
+                  className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300 mt-1 transition-colors"
                 >
                   <X size={12} /> Remove
                 </button>
               </motion.div>
             ) : (
               <motion.div
-                key="empty"
+                key="no-file"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
                 className="flex flex-col items-center gap-2"
               >
                 <UploadCloud size={36} className="text-white/20" />
                 <p className="text-white/50 text-sm">
                   {isDragActive ? 'Drop it here!' : 'Drag & drop a file, or click to browse'}
                 </p>
-                <p className="text-white/20 text-xs">Max 100 MB</p>
+                <p className="text-white/20 text-xs">Max 100 MB — any file type</p>
               </motion.div>
             )}
           </AnimatePresence>
@@ -125,24 +144,35 @@ export default function UploadModal({ open, onClose }) {
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
+              className="overflow-hidden"
             >
-              <div className="flex items-center justify-between text-xs text-white/40 mb-1">
-                <span>Uploading...</span>
+              <div className="flex items-center justify-between text-xs text-white/40 mb-1.5">
+                <span>{
+                  progress < 50 ? 'Uploading to storage...' :
+                  progress < 90 ? 'Getting file URL...' :
+                  'Saving to database...'
+                }</span>
                 <span>{progress}%</span>
               </div>
               <div className="h-1.5 bg-dark-500 rounded-full overflow-hidden">
                 <motion.div
                   className="h-full bg-gradient-to-r from-accent to-accent-light rounded-full"
-                  initial={{ width: 0 }}
                   animate={{ width: `${progress}%` }}
-                  transition={{ duration: 0.3 }}
+                  transition={{ duration: 0.4 }}
                 />
               </div>
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* Done state */}
+        {/* Error */}
+        {error && (
+          <p className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
+            {error}
+          </p>
+        )}
+
+        {/* Done */}
         <AnimatePresence>
           {done && (
             <motion.div
@@ -155,18 +185,22 @@ export default function UploadModal({ open, onClose }) {
           )}
         </AnimatePresence>
 
-        {/* Metadata fields */}
+        {/* Form fields */}
         {!done && (
           <>
             <div>
-              <label className="text-sm text-white/60 mb-1.5 block">Title <span className="text-red-400">*</span></label>
+              <label className="text-sm text-white/60 mb-1.5 block">
+                Title <span className="text-red-400">*</span>
+              </label>
               <input
                 value={title}
                 onChange={e => setTitle(e.target.value)}
                 placeholder="File title"
                 className="input"
+                disabled={uploading}
               />
             </div>
+
             <div>
               <label className="text-sm text-white/60 mb-1.5 block">Description</label>
               <textarea
@@ -175,8 +209,10 @@ export default function UploadModal({ open, onClose }) {
                 placeholder="Short description..."
                 rows={2}
                 className="input resize-none"
+                disabled={uploading}
               />
             </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-sm text-white/60 mb-1.5 block">Category</label>
@@ -184,6 +220,7 @@ export default function UploadModal({ open, onClose }) {
                   value={category}
                   onChange={e => setCategory(e.target.value)}
                   className="input"
+                  disabled={uploading}
                 >
                   <option value="">Uncategorized</option>
                   {categories.map(c => (
@@ -198,16 +235,18 @@ export default function UploadModal({ open, onClose }) {
                   onChange={e => setTagsRaw(e.target.value)}
                   placeholder="tag1, tag2, tag3"
                   className="input"
+                  disabled={uploading}
                 />
               </div>
             </div>
+
             <button
               onClick={handleUpload}
               disabled={uploading || !file || !title.trim()}
-              className="btn-primary w-full flex items-center justify-center gap-2 mt-2"
+              className="btn-primary w-full flex items-center justify-center gap-2 mt-1"
             >
               <UploadCloud size={16} />
-              {uploading ? `Uploading ${progress}%` : 'Upload File'}
+              {uploading ? `Uploading... ${progress}%` : 'Upload File'}
             </button>
           </>
         )}
